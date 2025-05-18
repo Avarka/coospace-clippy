@@ -1,8 +1,8 @@
-import html2canvas from 'html2canvas';
 import slug from 'slug'
 import imageSource from '../content/giphy.gif';
 import './quiz-result-helper.css';
 import { addQuestion, Question } from '../database';
+import { getElementsFromQuestionContainer, getQuestionContainers, screenshotElement, toggleAnswerIdsInForm } from '../quiz-common/common';
 
 const isChrome = navigator.userAgent.includes('Chrome');
 
@@ -20,7 +20,7 @@ const html = `
 </div>
 `;
 
-async function saveAllQuestions() {
+async function saveAllQuestions(topicName: string = "unknown") {
     const deduplication = [] as string[];
 
     const answerList: {
@@ -30,20 +30,18 @@ async function saveAllQuestions() {
     }[] = [];
 
     // @ts-expect-error
-    const topic = document.getElementById('save-topic-name')?.value ?? 'unknown';
+    const topic = document.getElementById('save-topic-name')?.value ?? topicName;
 
     while (true) {
         // second a tag
         const nextButton = document.querySelector('#page_buttons a:nth-child(2)') as HTMLAnchorElement;
 
-        const questionsContainers = document.querySelectorAll('.mainbox');
-        const questionsContainersArray = Array.from(questionsContainers);
+        const questionsContainersArray = getQuestionContainers();
 
         let questions = [];
 
         for (const questionContainer of questionsContainersArray) {
-            const questionId = questionContainer.id;
-            const questionNumber = questionId.split('_')[1] ?? 0;
+            const { questionNumber } = getElementsFromQuestionContainer(questionContainer);
 
             if (!questionNumber) {
                 continue;
@@ -60,14 +58,11 @@ async function saveAllQuestions() {
                 continue;
             }
 
-            questionContainer.scrollIntoView();
 
             const good = questionContainer.classList.contains('question_good');
             const question = questionContainer.querySelector('.userhtml')?.textContent ?? '-';
             const answersDivs = questionContainer.querySelectorAll('.valids');
             const answers = answersDivs ? [...answersDivs].map((_) => _.textContent ?? '-') : [];
-
-            const screenshot = await html2canvas(questionContainer);
 
             const question_slug = slug(question, { lower: true, replacement: '_' });
 
@@ -81,10 +76,7 @@ async function saveAllQuestions() {
 
             const fileName = `question_${question_slug.split("_").slice(0, 15).join("_")}_${good ? 'good' : 'bad'}.png`;
 
-            const link = document.createElement('a');
-            link.download = fileName;
-            link.href = screenshot.toDataURL();
-            link.click();
+            await screenshotElement(questionContainer, fileName);
 
             const questionEntiy: Question = {
                 slug: question_slug,
@@ -153,7 +145,7 @@ export default function setupQuizResultHelper() {
             console.log('Toggling clippy...');
             clippyContainer.classList.toggle('hidden');
         } else if (event.key === 'l') {
-            // console.log
+            toggleAnswerIdsInForm();
         }
     });
 
